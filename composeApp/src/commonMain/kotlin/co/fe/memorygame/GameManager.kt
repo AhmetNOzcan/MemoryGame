@@ -37,7 +37,7 @@ val IMAGES = arrayOf(
 
 class GameManager {
 
-    val state = MutableStateFlow(GameState(rowCount = 0, columnCount = 0, itemsCount = 0, items = emptyArray(), gameProgress = GameProgress.Idle))
+    val state = MutableStateFlow(GameState(rowCount = 0, columnCount = 0, itemsCount = 0, items = emptyArray()))
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -71,7 +71,6 @@ class GameManager {
                 columnCount = pair.first,
                 rowCount = pair.second,
                 items = gameBoardMatrix,
-                gameProgress = GameProgress.InProgress,
                 foundCount = 0,
                 firstGuess = null,
                 secondGuess = null,
@@ -126,7 +125,6 @@ class GameManager {
 
             var status: CellStatus = CellStatus.Opened
             var foundCount = state.value.foundCount
-            var gameProgress = state.value.gameProgress
             var addToScore = 0
 
             if (state.value.firstGuess?.cellValue == guess.cellValue) {
@@ -145,7 +143,11 @@ class GameManager {
                 items[row][column] = guess.copy(status = status)
 
                 if (foundCount == (state.value.rowCount * state.value.columnCount) / 2) {
-                    gameProgress = GameProgress.Win
+                    //
+                    scope.launch {
+                        delay(3000)
+                        initGame()
+                    }
                 }
 
                 state.update { s ->
@@ -154,7 +156,6 @@ class GameManager {
                         firstGuess = items[f.row][f.column],
                         secondGuess = items[row][column],
                         foundCount = foundCount,
-                        gameProgress = gameProgress,
                         score = s.score + addToScore,
                     )
                 }

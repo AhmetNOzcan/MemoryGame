@@ -9,7 +9,6 @@ data class GameState(
     val secondGuess: Cell? = null,
     val foundCount: Int = 0,
     val items: Array<Array<Cell>>,
-    val gameProgress: GameProgress,
     val score: Int = 0,
     val level: Int = 0,
     val imagesList: List<String> = emptyList(),
@@ -28,7 +27,6 @@ data class GameState(
         if (secondGuess != other.secondGuess) return false
         if (foundCount != other.foundCount) return false
         if (!items.contentDeepEquals(other.items)) return false
-        if (gameProgress != other.gameProgress) return false
         if (score != other.score) return false
         if (level != other.level) return false
         if (imagesList != other.imagesList) return false
@@ -44,7 +42,6 @@ data class GameState(
         result = 31 * result + (secondGuess?.hashCode() ?: 0)
         result = 31 * result + foundCount
         result = 31 * result + items.contentDeepHashCode()
-        result = 31 * result + gameProgress.hashCode()
         result = 31 * result + score
         result = 31 * result + level
         result = 31 * result + imagesList.hashCode()

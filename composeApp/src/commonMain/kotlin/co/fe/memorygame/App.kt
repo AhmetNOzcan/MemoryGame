@@ -62,10 +62,8 @@ fun App() {
     val gameManager = remember { GameManager() }
     val state = gameManager.state.collectAsStateWithLifecycle()
 
-    LaunchedEffect(state.value.gameProgress) {
-        if (state.value.gameProgress == GameProgress.Idle || state.value.gameProgress == GameProgress.Win) {
-            gameManager.initGame()
-        }
+    LaunchedEffect(Unit) {
+        gameManager.initGame()
     }
 
     MaterialTheme {
