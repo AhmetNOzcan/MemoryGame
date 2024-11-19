@@ -1,56 +1,53 @@
 package co.fe.memorygame
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
-data class GameState(
-    val columnCount: Int = 0,
-    val rowCount: Int = 0,
-    val firstGuess: Cell? = null,
-    val secondGuess: Cell? = null,
-    val foundCount: Int = 0,
-    val items: Array<Array<Cell>>,
-    val gameProgress: GameProgress
-) {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other == null || this::class != other::class) return false
-
-        other as GameState
-
-        if (columnCount != other.columnCount) return false
-        if (rowCount != other.rowCount) return false
-        if (firstGuess != other.firstGuess) return false
-        if (secondGuess != other.secondGuess) return false
-        if (foundCount != other.foundCount) return false
-        if (!items.contentDeepEquals(other.items)) return false
-        if (gameProgress != other.gameProgress) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = columnCount
-        result = 31 * result + rowCount
-        result = 31 * result + (firstGuess?.hashCode() ?: 0)
-        result = 31 * result + (secondGuess?.hashCode() ?: 0)
-        result = 31 * result + foundCount
-        result = 31 * result + items.contentDeepHashCode()
-        result = 31 * result + gameProgress.hashCode()
-        return result
-    }
-}
+val IMAGES = arrayOf(
+    "birds_icon",
+    "bulls_icon",
+    "camels_icon",
+    "cats_icon",
+    "cows_icon",
+    "dogs_icon",
+    "ducks_icon",
+    "elephants_icon",
+    "fishes_icon",
+    "giraffes_icon",
+    "gooses_icon",
+    "horses_icon",
+    "lions_icon",
+    "rabbits_icon",
+    "rat_icon",
+    "tigers_icon",
+    "turtles_icon",
+    "wolfs_icon",
+    "monkey_icon",
+    "husky_icon",
+    "pig_icon",
+    "koala_icon",
+    "bear_icon",
+    "goat_icon",
+)
 
 class GameManager {
 
-    val state = MutableStateFlow(GameState(columnCount = 0, rowCount = 0, items = emptyArray(), gameProgress = GameProgress.Idle))
+    val state = MutableStateFlow(GameState(rowCount = 0, columnCount = 0, itemsCount = 0, items = emptyArray(), gameProgress = GameProgress.Idle))
 
-    fun initGame(columnCount: Int) {
-        val uniqueItemCount = (columnCount * (state.value.rowCount + 1)) / 2
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
+    fun initGame() {
+        val itemsCount = state.value.itemsCount + 4
+        val pair = closestFactors(itemsCount)
+        val uniqueItemCount = itemsCount / 2
         val gameItems = mutableListOf<Int>()
 
-        for (i in 0..<uniqueItemCount) {
+        for (i in 0..< uniqueItemCount) {
             gameItems.add(i)
             gameItems.add(i)
         }
@@ -59,9 +56,9 @@ class GameManager {
 
         var index = 0
 
-        val gameBoardMatrix = Array(state.value.rowCount + 1) { r ->
-            val item = Array(columnCount) { c ->
-                val item = Cell(cellValue = gameItems[index], column = c, row = r)
+        var gameBoardMatrix = Array(pair.second) { r ->
+            val item = Array(pair.first) { c ->
+                val item = Cell(cellValue = gameItems[index], column = c, row = r, status = CellStatus.Opened)
                 index++
                 item
             }
@@ -69,19 +66,44 @@ class GameManager {
         }
 
         state.update {
-            state.value.copy(
-                columnCount = columnCount,
-                rowCount = state.value.rowCount + 1,
+            it.copy(
+                itemsCount = itemsCount,
+                columnCount = pair.first,
+                rowCount = pair.second,
                 items = gameBoardMatrix,
                 gameProgress = GameProgress.InProgress,
                 foundCount = 0,
                 firstGuess = null,
-                secondGuess = null
+                secondGuess = null,
+                level = it.level + 1,
+                imagesList = IMAGES.toList().shuffled().subList(0, uniqueItemCount),
+                previewMode = true
             )
+        }
+
+        scope.launch {
+            delay(1000)
+            index = 0
+            gameBoardMatrix = Array(pair.second) { r ->
+                val item = Array(pair.first) { c ->
+                    val item = Cell(cellValue = gameItems[index], column = c, row = r, status = CellStatus.Closed)
+                    index++
+                    item
+                }
+                item
+            }
+            state.update {
+                it.copy(
+                    items = gameBoardMatrix,
+                    previewMode = false
+                )
+            }
         }
     }
 
     fun guess(column: Int, row: Int) {
+        if (state.value.previewMode) return
+
         val guess = state.value.items[row][column]
 
         if(guess.status == CellStatus.Match) return
@@ -105,10 +127,15 @@ class GameManager {
             var status: CellStatus = CellStatus.Opened
             var foundCount = state.value.foundCount
             var gameProgress = state.value.gameProgress
+            var addToScore = 0
 
             if (state.value.firstGuess?.cellValue == guess.cellValue) {
                 status = CellStatus.Match
+                addToScore = 1
                 foundCount++
+            }
+            else {
+                addToScore = -1
             }
 
             state.value.firstGuess?.let { f ->
@@ -127,7 +154,8 @@ class GameManager {
                         firstGuess = items[f.row][f.column],
                         secondGuess = items[row][column],
                         foundCount = foundCount,
-                        gameProgress = gameProgress
+                        gameProgress = gameProgress,
+                        score = s.score + addToScore,
                     )
                 }
             }
@@ -157,6 +185,17 @@ class GameManager {
             }
         }
         println(state.value)
+    }
+
+    private fun closestFactors(number: Int): Pair<Int, Int> {
+        val sqrt = kotlin.math.sqrt(number.toDouble()).toInt()
+        for (x in sqrt downTo 1) {
+            if (number % x == 0) {
+                val y = number / x
+                return Pair(x, y)
+            }
+        }
+        return Pair(0, 0)
     }
 }
 
