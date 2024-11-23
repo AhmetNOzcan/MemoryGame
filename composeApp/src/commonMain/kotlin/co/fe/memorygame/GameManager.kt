@@ -3,8 +3,10 @@ package co.fe.memorygame
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -35,11 +37,19 @@ val IMAGES = arrayOf(
     "goat_icon",
 )
 
+sealed interface GameAction {
+    data object GameWon: GameAction
+    data object GameLost: GameAction
+}
+
 class GameManager {
 
     val state = MutableStateFlow(GameState(rowCount = 0, columnCount = 0, itemsCount = 0, items = emptyArray()))
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
+    private val _eventChannel = Channel<GameAction>()
+    val eventChannel = _eventChannel.receiveAsFlow()
 
     fun initGame() {
         val itemsCount = state.value.itemsCount + 4
@@ -47,53 +57,35 @@ class GameManager {
         val uniqueItemCount = itemsCount / 2
         val gameItems = mutableListOf<Int>()
 
-        for (i in 0..< uniqueItemCount) {
-            gameItems.add(i)
-            gameItems.add(i)
-        }
+        scope.launch(Dispatchers.Default) {
 
-        gameItems.shuffle()
-
-        var index = 0
-
-        var gameBoardMatrix = Array(pair.second) { r ->
-            val item = Array(pair.first) { c ->
-                val item = Cell(cellValue = gameItems[index], column = c, row = r, status = CellStatus.Opened)
-                index++
-                item
+            for (i in 0..< uniqueItemCount) {
+                gameItems.add(i)
+                gameItems.add(i)
             }
-            item
-        }
 
-        state.update {
-            it.copy(
-                itemsCount = itemsCount,
-                columnCount = pair.first,
-                rowCount = pair.second,
-                items = gameBoardMatrix,
-                foundCount = 0,
-                firstGuess = null,
-                secondGuess = null,
-                level = it.level + 1,
-                imagesList = IMAGES.toList().shuffled().subList(0, uniqueItemCount),
-                previewMode = true
-            )
-        }
+            gameItems.shuffle()
 
-        scope.launch {
-            delay(1000)
-            index = 0
-            gameBoardMatrix = Array(pair.second) { r ->
-                val item = Array(pair.first) { c ->
-                    val item = Cell(cellValue = gameItems[index], column = c, row = r, status = CellStatus.Closed)
-                    index++
-                    item
-                }
-                item
-            }
             state.update {
                 it.copy(
-                    items = gameBoardMatrix,
+                    itemsCount = itemsCount,
+                    columnCount = pair.first,
+                    rowCount = pair.second,
+                    items = createGameBoard(pair.second, pair.first, CellStatus.Opened, gameItems),
+                    foundCount = 0,
+                    firstGuess = null,
+                    secondGuess = null,
+                    level = it.level + 1,
+                    imagesList = IMAGES.toList().shuffled().subList(0, uniqueItemCount),
+                    previewMode = true
+                )
+            }
+
+            delay(2500)
+
+            state.update {
+                it.copy(
+                    items = createGameBoard(pair.second, pair.first, CellStatus.Closed, gameItems),
                     previewMode = false
                 )
             }
@@ -143,10 +135,13 @@ class GameManager {
                 items[row][column] = guess.copy(status = status)
 
                 if (foundCount == (state.value.rowCount * state.value.columnCount) / 2) {
-                    //
+                    state.update {
+                        it.copy(
+                            previewMode = true
+                        )
+                    }
                     scope.launch {
-                        delay(3000)
-                        initGame()
+                        _eventChannel.send(GameAction.GameWon)
                     }
                 }
 
@@ -198,13 +193,19 @@ class GameManager {
         }
         return Pair(0, 0)
     }
-}
 
-enum class GameProgress {
-    Idle,
-    InProgress,
-    Win,
-    Lose
+    private fun createGameBoard(rowCount: Int, columnCount: Int, status: CellStatus, gameItems: List<Int>): Array<Array<Cell>> {
+        var index = 0
+        return Array(rowCount) { r ->
+            val item = Array(columnCount) { c ->
+                val item = Cell(cellValue = gameItems[index], column = c, row = r, status = status)
+                index++
+                item
+            }
+            item
+        }
+    }
+
 }
 
 sealed interface CellStatus {
