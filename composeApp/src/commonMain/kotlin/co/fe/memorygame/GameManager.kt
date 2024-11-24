@@ -39,7 +39,6 @@ val IMAGES = arrayOf(
 
 sealed interface GameAction {
     data object GameWon: GameAction
-    data object GameLost: GameAction
 }
 
 class GameManager {

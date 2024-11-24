@@ -5,12 +5,10 @@ package co.fe.memorygame
 import androidx.compose.animation.Animatable
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,20 +29,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import memorygame.composeapp.generated.resources.Res
 import memorygame.composeapp.generated.resources.allDrawableResources
-import memorygame.composeapp.generated.resources.compose_multiplatform
 import memorygame.composeapp.generated.resources.home
-import memorygame.composeapp.generated.resources.rat_icon
-import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
 
@@ -61,6 +56,17 @@ private val COLOR_BACKGROUND = Color(0xFFE65100)
 fun App() {
     val gameManager = remember { GameManager() }
     val state = gameManager.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        gameManager.eventChannel.collect {
+            when(it) {
+                GameAction.GameWon -> {
+                    delay(1000)
+                    gameManager.initGame()
+                }
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         gameManager.initGame()
